@@ -1,8 +1,8 @@
-# example config for connchecky
+# example config for conncheck
 
 
-name: connchecky-1
-file-log-path: $HOME/tmp/connchecky-events.txt
+name: conncheck-1
+file-log-path: $HOME/tmp/conncheck-events.txt
 listeners:
   - name: listener1
     ipv4: 0.0.0.0

@@ -77,15 +77,15 @@ def main() -> None:
         logging.error("Couldn't load config. %s", str(e))
         print("Abnormal program end; problem reading config %s" % config_file)
         sys.exit(1)
-    logging.info("ConnChecky: config file: %s, log level=%s",
+    logging.info("ConnCheck: config file: %s, log level=%s",
                  config_file, args.loglevel.upper())
-    logging.info("ConnChecky starting:")
+    logging.info("ConnCheck starting:")
     logging.debug("config loaded: %s", _config)
     # Now run the main loop
     logging.debug("Running async main")
     async_run_utils.run_async(main_program.async_main(args))
     logging.debug("Async main has completed - program exiting cleanly.")
-    logging.info("ConnChecky ends.")
+    logging.info("ConnCheck ends.")
 
 
 if __name__ == '__main__':

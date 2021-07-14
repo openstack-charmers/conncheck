@@ -1,4 +1,4 @@
-# connchecky - a connection checker (client and server)
+# conncheck - a connection checker (client and server)
 
 A python3 only connectivity checker that keeps notes.
 
@@ -7,9 +7,9 @@ either/and provides a server to send a reply (and timestamps that) or sends
 requests expecting a reply (and timestamps that).  It records all the events
 (and whether they were missed) to a log file.
 
-Source code: https://github.com/openstack-charmers/connchecky
+Source code: https://github.com/openstack-charmers/conncheck
 
-Bug reports: https://github.com/openstack-charmers/connchecky/issues
+Bug reports: https://github.com/openstack-charmers/conncheck/issues
 
 #### Execute Python Unit Tests
 
