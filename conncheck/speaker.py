@@ -24,9 +24,9 @@ from typing import (
 
 import aiohttp
 
-import events
-import async_run_utils as run
-import utils
+import conncheck.events as events
+import conncheck.async_run_utils as run
+import conncheck.utils as utils
 
 
 class SpeakerBase:

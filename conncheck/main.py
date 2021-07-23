@@ -19,9 +19,9 @@ import asyncio
 # from typing import (
 # )
 
-import config
-import listener
-import speaker
+import conncheck.config as config
+import conncheck.listener as listener
+import conncheck.speaker as speaker
 
 
 async def async_main(args: argparse.Namespace) -> None:
@@ -36,12 +36,12 @@ async def async_main(args: argparse.Namespace) -> None:
     try:
         listeners = [listener.listener_factory_from_config(c)
                      for c in _config[config.LISTENERS]]
-    except Exception as e:
+    except Exception:
         raise
     try:
         speakers = [speaker.speaker_factory_from_config(s)
                     for s in _config[config.SPEAKERS]]
-    except Exception as e:
+    except Exception:
         raise
     # awaitables for the listeners.
     awaitables.extend(l.listen() for l in listeners)

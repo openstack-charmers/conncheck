@@ -37,7 +37,8 @@ install_require = [
     # 'jinja2',
     # 'juju',
     # 'juju-wait',
-    # 'PyYAML',
+    'aiohttp',
+    'PyYAML',
     # 'tenacity',
     # 'python-libmaas',
 ]
@@ -93,15 +94,7 @@ if sys.argv[-1] == 'tag':
 setup(
     entry_points={
         'console_scripts': [
-            # 'functest-run-suite = zaza.charm_lifecycle.func_test_runner:main',
-            # 'functest-before-deploy = zaza.charm_lifecycle.before_deploy:main',
-            # 'functest-deploy = zaza.charm_lifecycle.deploy:main',
-            # 'functest-configure = zaza.charm_lifecycle.configure:main',
-            # 'functest-destroy = zaza.charm_lifecycle.destroy:main',
-            # 'functest-prepare = zaza.charm_lifecycle.prepare:main',
-            # 'functest-test = zaza.charm_lifecycle.test:main',
-            # 'current-apps = zaza.model:main',
-            # 'tempest-config = zaza.tempest_config:main',
+            'conncheck = conncheck.cli:main',
         ]
     },
     license='Apache-2.0: http://www.apache.org/licenses/LICENSE-2.0',

@@ -23,7 +23,7 @@ from typing import (
     Any,
     Awaitable,
 )
-import sys #import version_info
+import sys
 
 
 def run_async(step: Awaitable) -> Any:
@@ -39,7 +39,7 @@ def run_async(step: Awaitable) -> Any:
     task = loop.create_task(step)
     loop.run_until_complete(asyncio.wait([task], loop=loop))
 
-    is_ge_37 = sys.version_info.major >=3 and sys.version_info.minor >= 7
+    is_ge_37 = sys.version_info.major >= 3 and sys.version_info.minor >= 7
     # Cancel any remaining tasks:
     while True:
         if is_ge_37:

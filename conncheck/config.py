@@ -22,8 +22,8 @@ from typing import (
     Optional,
 )
 
-import defaults
-import utils
+import conncheck.defaults as defaults
+import conncheck.utils as utils
 
 # defines for sections
 LISTENERS = "listeners"
@@ -38,7 +38,7 @@ class ConfigError(Exception):
     pass
 
 
-def get_config(file: Optional[str] =  None,
+def get_config(file: Optional[str] = None,
                reload: bool = False) -> Dict[str, Any]:
     """Load the config from the config file and return as a dict.
 

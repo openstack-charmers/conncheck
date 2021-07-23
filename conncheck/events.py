@@ -33,8 +33,8 @@ from typing import (
     IO
 )
 
-import config
-import defaults
+import conncheck.config as config
+import conncheck.defaults as defaults
 
 
 # event types

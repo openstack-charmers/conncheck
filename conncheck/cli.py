@@ -22,9 +22,9 @@ import logging
 import os
 import sys
 
-import config
-import async_run_utils
-import main as main_program
+import conncheck.config
+import conncheck.async_run_utils
+import conncheck.main as main_program
 
 
 def parse_args() -> argparse.Namespace:
@@ -66,14 +66,14 @@ def setup_logging(log_level: str ='INFO') -> None:
 
 def main() -> None:
     """Main entry for the program."""
-    async_run_utils.register_signal_handlers()
+    conncheck.async_run_utils.register_signal_handlers()
     args = parse_args()
     setup_logging(args.loglevel.upper())
     # Force a completely fresh reload of the config.
     config_file = os.path.abspath(args.config)
     try:
-        _config = config.get_config(file=config_file, reload=True)
-    except config.ConfigError as e:
+        _config = conncheck.config.get_config(file=config_file, reload=True)
+    except conncheck.config.ConfigError as e:
         logging.error("Couldn't load config. %s", str(e))
         print("Abnormal program end; problem reading config %s" % config_file)
         sys.exit(1)
@@ -83,7 +83,7 @@ def main() -> None:
     logging.debug("config loaded: %s", _config)
     # Now run the main loop
     logging.debug("Running async main")
-    async_run_utils.run_async(main_program.async_main(args))
+    conncheck.async_run_utils.run_async(main_program.async_main(args))
     logging.debug("Async main has completed - program exiting cleanly.")
     logging.info("ConnCheck ends.")
 
