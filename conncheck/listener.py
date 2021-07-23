@@ -27,13 +27,13 @@ import logging
 import aiohttp
 import aiohttp.web
 
-import conncheck.defaults as defaults
 import conncheck.events as events
 import conncheck.utils as utils
 import conncheck.async_run_utils as run
 
 
 class ListenerBase:
+    """Listener Base class."""
 
     def __init__(self, config: Dict[str, str]) -> None:
         """Create a ListenerBase object.
@@ -55,6 +55,7 @@ class ListenerBase:
         self._counter = 0
 
     def next_count(self) -> int:
+        """Return the next counter."""
         self._counter += 1
         return self._counter
 
@@ -66,24 +67,30 @@ class ListenerBase:
         """Clean up after ourselves, prior to being shutdown."""
         pass
 
-    def __str__(self):
+    def __str__(self) -> str:
+        """Return string description."""
         return (f"{self.__class__.__name__}: {self.name} listening on "
                 f"{self.ipv4}:{self.port} using protocol {self.protocol}, "
                 f"reply size is: {self.reply_size}")
 
 
 class ListenerUDP(ListenerBase):
+    """Listener UDP class."""
 
     class UDPServer:
+        """UDP Server class."""
 
         def __init__(self, listener):
+            """Initialise a UDPServer instance."""
             self.listener = listener
 
         def connection_made(self, transport):
+            """Connection_made callback."""
             logging.debug("UDPServer for %s made", self.listener.name)
             self.transport = transport
 
         def datagram_received(self, data, addr):
+            """Datagram_received callback."""
             # assume it is text.
             message = data.decode()
             reply = self.listener._handle_datagram(message, addr)
@@ -91,10 +98,11 @@ class ListenerUDP(ListenerBase):
             self.transport.sendto(reply.encode(), addr)
 
         def error_received(self, exc: Exception) -> None:
+            """Error_received callback."""
             self.listener._error_received(exc)
 
         def connection_lost(self, exc: Optional[Exception]) -> None:
-            # tell our owner that we ened.
+            """Connection_lost callback."""
             self.listener._connection_lost(exc)
 
     def __init__(self, *args, **kwargs) -> None:
@@ -112,7 +120,8 @@ class ListenerUDP(ListenerBase):
             count = line.split(" ")[2]
         except KeyError:
             count = "<not-detected>"
-        self.events.log_event(events.REPLY_TO_DGRAN, count, addr[0], addr[1])
+        self.events.log_event(events.REPLY_TO_DGRAN, count=count, ipv4=addr[0],
+                              port=addr[1])
         return utils.pad_text(f"{count}\n", self.reply_size)
 
     def _connection_lost(self, exc: Optional[Exception]) -> None:
@@ -153,8 +162,10 @@ class ListenerUDP(ListenerBase):
 
 
 class ListenerHTTP(ListenerBase):
+    """HTTP Listener class."""
 
     def __init__(self, *args, **kwargs) -> None:
+        """Initialise an HTTP Listener."""
         super().__init__(*args, **kwargs)
         logging.debug(f"Creating {self}")
         self.server = None
@@ -166,10 +177,8 @@ class ListenerHTTP(ListenerBase):
             request: aiohttp.web.Request
         ) -> aiohttp.web.Response:
             counter = self.next_count()
-            self.events.log_event(
-                events.REPLY_HTTP,
-                request.remote,
-                f"Replying to {request.remote} counter: {counter}")
+            self.events.log_event(events.REPLY_HTTP, url=request.remote,
+                                  counter=counter)
             reply = f"Response {counter} from {self.name}.\n"
             return aiohttp.web.Response(
                 text=utils.pad_text(reply, self.reply_size))
@@ -177,7 +186,7 @@ class ListenerHTTP(ListenerBase):
         return handler
 
     async def listen(self) -> None:
-        print("listent")
+        """Listen on the configured address and port for this listener."""
         self.server = aiohttp.web.Server(self._make_handler())
         self.runner = aiohttp.web.ServerRunner(self.server)
         await self.runner.setup()

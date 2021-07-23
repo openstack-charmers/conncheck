@@ -3,17 +3,19 @@
 
 name: conncheck-1
 file-log-path: $HOME/tmp/conncheck-events.txt
+log-format: line-protocol
+collection: collection-name
 listeners:
   - name: listener1
     ipv4: 0.0.0.0
     port: 8082
     protocol: udp
     reply-size: 1024
-  #- name: listener2
-    #ipv4: 0.0.0.0
-    #port: 8081
-    #protocol: http
-    #reply-size: 1024
+  - name: listener2
+    ipv4: 0.0.0.0
+    port: 8081
+    protocol: http
+    reply-size: 1024
 speakers:
   - name: speaker1
     ipv4: 127.0.0.1
@@ -22,18 +24,18 @@ speakers:
     send-size: 1024
     wait: 5
     interval: 10
-  #- name: speaker2
-    #url: http://127.0.0.1:8081/{counter}
-    #protocol: http
-    #wait: 5
-    #interval: 10
-  #- name: speaker3
-    #url: http://127.0.0.1:8082/{counter}
-    #protocol: http
-    #wait: 3
-    #interval: 7
-events:
-  - type: tick
-    name: ticker
-    interval: 5
+  - name: speaker2
+    url: http://127.0.0.1:8081/{counter}
+    protocol: http
+    wait: 5
+    interval: 10
+  - name: speaker3
+    url: http://127.0.0.1:8082/{counter}
+    protocol: http
+    wait: 3
+    interval: 7
+#events:
+  #- type: tick
+    #name: ticker
+    #interval: 5
 

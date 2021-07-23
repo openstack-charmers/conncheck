@@ -21,9 +21,12 @@ CONFIG_FILE = "./config.yml"
 LOG_FILE_KEY = "file-log-path"
 APPEND_TO_LOG_KEY = "file-log-append"
 UNIT_NAME_KEY = "name"
+LOG_FORMAT_KEY = "log-format"
+COLLECTION_NAME_KEY = "collection"
 
 # defaults to merge in if missing from provided config
 CONFIG_DEFAULTS = {
     LOG_FILE_KEY: CONFIG_FILE,
     APPEND_TO_LOG_KEY: True,
+    LOG_FORMAT_KEY: "line-protocol"
 }

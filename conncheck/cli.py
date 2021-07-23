@@ -44,7 +44,7 @@ def parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
-def setup_logging(log_level: str ='INFO') -> None:
+def setup_logging(log_level: str = 'INFO') -> None:
     """Do setup for logging.
 
     :returns: Nothing: This fucntion is executed for its sideffect
@@ -65,7 +65,7 @@ def setup_logging(log_level: str ='INFO') -> None:
 
 
 def main() -> None:
-    """Main entry for the program."""
+    """Is Main."""
     conncheck.async_run_utils.register_signal_handlers()
     args = parse_args()
     setup_logging(args.loglevel.upper())

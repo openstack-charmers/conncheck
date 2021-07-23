@@ -25,7 +25,7 @@ import conncheck.speaker as speaker
 
 
 async def async_main(args: argparse.Namespace) -> None:
-    """The async main program.
+    """Async main program.
 
     - Parse the config for listeners, speakers and a ticker.
     - Set up the tasks to run them.
@@ -44,10 +44,10 @@ async def async_main(args: argparse.Namespace) -> None:
     except Exception:
         raise
     # awaitables for the listeners.
-    awaitables.extend(l.listen() for l in listeners)
+    awaitables.extend(listener.listen() for listener in listeners)
     awaitables.extend(s.speak() for s in speakers)
     await asyncio.gather(*awaitables)
     # clean-up listeners
-    clean_ups = [l.clean_up() for l in listeners]
+    clean_ups = [listener.clean_up() for listener in listeners]
     clean_ups.extend(s.clean_up() for s in speakers)
     await asyncio.gather(*clean_ups)

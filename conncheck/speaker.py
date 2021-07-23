@@ -30,6 +30,7 @@ import conncheck.utils as utils
 
 
 class SpeakerBase:
+    """SpeakerBase class."""
 
     def __init__(self, config: Dict[str, str]) -> None:
         """Create a SpeakerBase object.
@@ -51,17 +52,19 @@ class SpeakerBase:
         self._counter = 0
 
     def next_count(self) -> int:
+        """Return the next count of this instance."""
         self._counter += 1
         return self._counter
 
-    async def fetch(self) -> None:
-        raise NotImplementedError("Need to define fetch()")
+    async def request(self) -> None:
+        """Run request for the speaker."""
+        raise NotImplementedError("Need to define request()")
 
     async def speak(self) -> None:
         """Send messages until interrupted."""
         while True:
             try:
-                await run.run_interruptable(self.fetch())
+                await run.run_interruptable(self.request())
                 logging.debug("speaker: %s, tick", self.name)
                 await run.sleep(self.interval, raise_interrupt=True)
             except run.InterruptException:
@@ -73,8 +76,10 @@ class SpeakerBase:
 
 
 class SpeakerUDP(SpeakerBase):
+    """UDP Requester/Speaker class."""
 
     def __init__(self, config: Dict[str, str]) -> None:
+        """Initialise a UDP Speaker."""
         super().__init__(config)
         self.ipv4 = config['ipv4']
         self.port = config['port']
@@ -102,16 +107,18 @@ class SpeakerUDP(SpeakerBase):
             count = message.splitlines()[0]
         except KeyError:
             count = "<no-count-detected>"
-        self.events.log_event(events.REPLY_DGRAM, count)
+        self.events.log_event(events.REPLY_DGRAM, count=count)
 
-    async def fetch(self) -> None:
+    async def request(self) -> None:
+        """Request a UDP reply from a listener."""
         try:
             counter = self.next_count()
             message = utils.pad_text(f"{self.name} Message {counter}",
                                      self.send_size)
             await self._send(message)
             self.events.log_event(
-                events.REQUEST_DGRAM, self.ipv4, self.port, counter, self.wait)
+                events.REQUEST_DGRAM, ipv4=self.ipv4, port=self.port,
+                counter=counter, wait=self.wait)
         except Exception as e:
             logging.error(
                 "%s (%s) raised %s",
@@ -143,15 +150,20 @@ class SpeakerUDP(SpeakerBase):
 
 
 class UDPClient:
+    """UDPClient."""
+
     def __init__(self, speaker: SpeakerUDP) -> None:
+        """Initialise a UDP client."""
         self.speaker = speaker
         self.transport = None
 
     def connection_made(self, transport):
+        """Connection_made callback."""
         self.transport = transport
         self.speaker._connection_made()
 
     def datagram_received(self, data, addr):
+        """Datagram_received callback."""
         # Assume data is text
         try:
             message = data.decode()
@@ -159,32 +171,37 @@ class UDPClient:
         except Exception as e:
             logging.debug("%s: couldn't decode message %s",
                           self.speaker.name, data)
-            print(str(e))
+            logging.error(str(e))
             import traceback
-            traceback.print_exc()
+            logging.error(traceback.format_exc())
 
     def error_received(self, exc: Exception) -> None:
+        """Error_received callback."""
         self.speaker._error_received(exc)
 
     def connection_lost(self, exc: Optional[Exception]) -> None:
+        """Connection_lost callback."""
         self.speaker._connection_lost(exc)
 
 
 class SpeakerHTTP(SpeakerBase):
+    """HTTP Speaker class."""
 
     def __init__(self, config: Dict[str, str]) -> None:
+        """Initialise a SpeakerHTTP object."""
         super().__init__(config)
         self.url = config['url']
         logging.debug("Building a SpeakerHTTP.")
 
-    async def fetch(self) -> None:
+    async def request(self) -> None:
+        """Do a request to an HTTP server."""
         try:
             counter = self.next_count()
             timeout = aiohttp.ClientTimeout(total=self.wait)
             url = (self.url.format(counter=counter)
                    if "{counter}" in self.url
                    else self.url)
-            self.events.log_event(events.REQUEST_HTTP, url, wait=self.wait)
+            self.events.log_event(events.REQUEST_HTTP, url=url, wait=self.wait)
             async with aiohttp.request('GET', url, timeout=timeout) as resp:
                 if resp.status == 200:
                     reply = await resp.text()
@@ -192,15 +209,18 @@ class SpeakerHTTP(SpeakerBase):
                         first = reply.splitlines()[0]
                         reply_counter = first.split(" ")[1]
                         self.events.log_event(
-                            events.REQUEST_SUCCESS, counter, reply_counter)
+                            events.REQUEST_SUCCESS, counter=counter,
+                            reply_counter=reply_counter)
                     except KeyError:
                         self.events.log_event(
-                            events.REQUEST_SUCCESS, counter, "UNKNOWN")
+                            events.REQUEST_SUCCESS, counter=counter,
+                            reply_counter="N/A")
         except asyncio.TimeoutError:
-            self.events.log_event(events.REQUEST_TIMEOUT, url, counter)
+            self.events.log_event(events.REQUEST_TIMEOUT, url=url,
+                                  counter=counter)
         except aiohttp.client_exceptions.ClientConnectionError:
-            self.events.log_event(events.REQUEST_FAIL, url, counter)
-        print(f"{self.name} fetch done")
+            self.events.log_event(events.REQUEST_FAIL, url=url,
+                                  counter=counter)
 
 
 _protocol_to_speaker = {

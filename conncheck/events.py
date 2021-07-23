@@ -20,8 +20,37 @@ enable logging to the 'event' file, as determined by the config for the program
 (config module).  This makes it easy for a module/coroutine to log events in
 a standardised way.
 
-TODO: it would be really cool if this module was in fact sharable with the zaza
-module.
+This module supports formatting in to formats:
+
+ - LOG
+ - InfluxDB
+
+ - LOG format is basically a human readable line.
+ - InfluxDB format is Line Protocol (from InfluxDB), and is used to integrate
+   with the rest of a Line Protocol set of logs.
+
+Line Protocols is:
+
+collection,tags fields timestamp
+
+The "tags" are a tag1=value,tag2=value,
+The "fields" are field1=value,field2=value
+
+The values are quoted.
+
+In common with the zaza.events module, the recognised fields are:
+
+ - event: the event being indicated.
+ - unit: some "unit" which is a collection of "items"
+ - item: the smallest 'thing' on a unit.
+
+All other field names (e.g. 'comment', 'to', 'from', 'log') are dealt with as
+tags and recorded there.
+
+For conncheck, the collection is/must-be written into the config.yaml so that
+it can be included in the logs.
+
+The timestamp is in ms.
 """
 
 import atexit
@@ -30,11 +59,17 @@ import logging
 import os
 
 from typing import (
-    IO
+    Dict,
+    IO,
+    Optional,
+    TypeVar,
 )
 
 import conncheck.config as config
 import conncheck.defaults as defaults
+
+
+_T = TypeVar('_T')
 
 
 # event types
@@ -62,6 +97,7 @@ logger = logging.getLogger()
 
 
 def get_log_file_handle() -> IO[str]:
+    """Return the log file handle."""
     global __log_file_handle
     global __log_file_name
     _config = config.get_config()
@@ -76,8 +112,22 @@ def get_log_file_handle() -> IO[str]:
     return __log_file_handle
 
 
+def get_log_format() -> str:
+    """Return the log format as lower-cased string."""
+    _config = config.get_config()
+    try:
+        return _config[defaults.LOG_FORMAT_KEY].lower()
+    except KeyError:
+        return "log"
+
+
+def is_influxdb_log_format() -> bool:
+    """Return true if influxdb log format."""
+    return get_log_format() == "influxdb"
+
+
 def atexit_close_filehandle() -> None:
-    """Function that closes the file when the script exits."""
+    """Close the file when the script exits."""
     global __log_file_handle
     if __log_file_handle is not None:
         try:
@@ -104,111 +154,18 @@ def write_to_event_log(msg: str) -> None:
     logging.debug("-> log-file: %s", msg)
 
 
-class FormatEventBase:
-    """Base class for formatting events."""
-    pass
-
-
-class FormatGeneric(FormatEventBase):
-    """Class for formatting a generic event with no message."""
-
-    def __str__(self):
-        return ""
-
-
-class FormatReply(FormatEventBase):
-    """Class for formatting a reply."""
-
-    def __init__(self, to: str, reply: str) -> None:
-        """Initialiser of the FormatReply class."""
-        self.to = to
-        self.reply = reply
-
-    def __str__(self) -> str:
-        """String representation of the format."""
-        return f"TO:{self.to} {self.reply}"
-
-
-class FormatRequestHttp(FormatEventBase):
-    """Class for formatting an HTTP request."""
-
-    def __init__(self, url: str, wait: float) -> None:
-        """Initialiser of the FormatRequestHttp class."""
-        self.url = url
-        self.wait = wait
-
-    def __str__(self) -> str:
-        """String representation of the format."""
-        return f"TO:{self.url} waiting: {self.wait}"
-
-
-class FormatRequestHttpCounter(FormatEventBase):
-    """Class for formatting an HTTP request."""
-
-    def __init__(self, url: str, counter: int) -> None:
-        """Initialiser of the FormatRequestHttp class."""
-        self.url = url
-        self.counter = counter
-
-    def __str__(self) -> str:
-        """String representation of the format."""
-        return f"TO:{self.url} counter: {self.counter}"
-
-
-class FormatRequestUDP(FormatEventBase):
-    """Class for formatting an HTTP request."""
-
-    def __init__(self, ipv4: str, port: int, counter: int, wait: int) -> None:
-        """Initialiser of the FormatRequestHttp class."""
-        self.ipv4 = ipv4
-        self.port = port
-        self.counter = counter
-        self.wait = wait
-
-    def __str__(self) -> str:
-        """String representation of the format."""
-        return (f"TO:{self.ipv4}:{self.port} counter: {self.counter} "
-                f"waiting: {self.wait}")
-
-
-class FormatReplyFromUDP(FormatEventBase):
-    """Class for formatting an UDP reply."""
-
-    def __init__(self, count: str) -> None:
-        """Initialiser of the FormatReplyFromUDP class."""
-        self.count = count
-
-    def __str__(self) -> str:
-        """String representation of the format."""
-        return f"Count:{self.count}"
-
-
-class FormatReplyToUDP(FormatEventBase):
-    """Class for formatting an UDP reply."""
-
-    def __init__(self, count: str, ipv4: str, port: int) -> None:
-        """Initialiser of the FormatReplyFromUDP class."""
-        self.count = count
-        self.ipv4 = ipv4
-        self.port = port
-
-    def __str__(self) -> str:
-        """String representation of the format."""
-        return f"Count:{self.count} address:{self.ipv4}:{self.port}"
-
-
 _event_to_format_map = {
-    START: FormatGeneric,
-    END: FormatGeneric,
-    TICK: FormatGeneric,
-    REPLY_HTTP: FormatReply,
-    REQUEST_HTTP: FormatRequestHttp,
-    REQUEST_FAIL: FormatRequestHttpCounter,
-    REQUEST_SUCCESS: FormatRequestHttpCounter,
-    REQUEST_TIMEOUT: FormatRequestHttpCounter,
-    REQUEST_DGRAM: FormatRequestUDP,
-    REPLY_DGRAM: FormatReplyFromUDP,
-    REPLY_TO_DGRAN: FormatReplyToUDP,
+    START: "",
+    END: "",
+    TICK: "",
+    REPLY_HTTP: "TO:{url} counter:{counter}",
+    REQUEST_HTTP: "TO:{url} waiting:{wait}",
+    REQUEST_FAIL: "TO:{url} counter:{counter}",
+    REQUEST_SUCCESS: "counter:{counter} reply:{reply_counter}",
+    REQUEST_TIMEOUT: "TO:{url} counter:{counter}",
+    REQUEST_DGRAM: "TO:{ipv4}:{port} counter:{counter} waiting:{wait}",
+    REPLY_DGRAM: "Count:{count}",
+    REPLY_TO_DGRAN: "Count:{count} address:{ipv4}:{port}"
 }
 
 
@@ -224,27 +181,91 @@ class EventLogger:
         self.unit_name = unit_name
         self.component_name = component_name
 
-    def log_event(self, event_type: str, *args, **kwargs) -> None:
+    def log_event(self, event_type: str, **kwargs) -> None:
         """Log an event to the log.
 
+        This logs to either InfluxDB (Line Protocol) or Human LOG format.  In
+        the case of InfluxDB, the collection must be set in the config.
+
         :param event_type: the event type from EventTypes
-        :param *args: additional information for the specific event.
         :param **kwargs: Optional additional arguments for the specific event.
         :raises: KeyError for an unknown event.
         :raises: ValueError for an invalid param
         """
-        if event_type not in _event_to_format_map:
-            raise KeyError(f"Unknown event type {event_type}")
-        try:
-            log = _event_to_format_map[event_type](*args, **kwargs)
-        except TypeError as e:
-            raise ValueError(f"Problem passing args to formatter: {e}")
-        # nice ISO8601 datetime - 2020-03-20T14:32:16.458361+13:00
-        now_str = datetime.datetime.now().astimezone().isoformat()
-        log_str = (
-            f"{now_str} {self.unit_name} {self.component_name} {event_type} "
-            f"{log}")
+        if is_influxdb_log_format():
+            fields = {
+                'event': event_type,
+                'unit': self.unit_name,
+                'item': self.component_name,
+            }
+            collection = config.get_config()[defaults.COLLECTION_NAME_KEY]
+            log_str = format_line_protocol(
+                collection, fields, kwargs, datetime.datetime.now())
+        else:
+            if event_type not in _event_to_format_map:
+                raise KeyError(f"Unknown event type {event_type}")
+            try:
+                log = _event_to_format_map[event_type].format(**kwargs)
+            except (KeyError, TypeError) as e:
+                raise ValueError(f"Problem passing args to formatter: {e}")
+            # nice ISO8601 datetime - 2020-03-20T14:32:16.458361+13:00
+            now_str = datetime.datetime.now().astimezone().isoformat()
+            log_str = (
+                f"{now_str} {self.unit_name} {self.component_name} "
+                f"{event_type} {log}")
         write_to_event_log(log_str)
+
+
+def format_line_protocol(
+    collection: str,
+    fields: Dict[str, str],
+    tags: Dict[str, str],
+    timestamp: Optional[datetime.datetime]
+) -> str:
+    """Format the Line Protocol string.
+
+    '{collection},{tags} {fields} {timestamp}'
+
+    :param collection: the collection to use.
+    :param fields: the collections of fields (event, unit, item)
+    :param tags: any additonal tags for the line
+    :param timestamp: a datetime.datetime structure for the log.
+    :returns: formatting log line.
+    """
+    if isinstance(timestamp, datetime.datetime):
+        timestamp = ("{}ms".format(int(timestamp.timestamp() * 1000)))
+    return (
+        "{collection}{tags}{fields}{timestamp}"
+        .format(
+            collection=collection,
+            tags=("" if not tags else ",{}".format(format_dict(tags))),
+            fields=("" if not fields else " {}"
+                    .format(format_dict(fields))),
+            timestamp=(" {}".format(timestamp) if timestamp else "")))
+
+
+def quote_value(value: str) -> str:
+    """Quote a value if it isn't quoted yet.
+
+    :param value: the string to quote
+    :returns: quoted value
+    """
+    if isinstance(value, str):
+        if value.startswith('"') and value.endswith('"'):
+            return value
+    return '"{}"'.format(value)
+
+
+def format_dict(d: Dict[_T, str]) -> Dict[_T, str]:
+    """Fromat a dictionary with quoted values.
+
+    :param d: the dictionary of values to quote.
+    :returns: single string of comma-seperated k="v" quoted items.
+    """
+    assert isinstance(d, dict)
+    return ",".join(
+        '{}={}'.format(k, quote_value(v))
+        for k, v in d.items())
 
 
 def get_event_logger(name: str) -> EventLogger:

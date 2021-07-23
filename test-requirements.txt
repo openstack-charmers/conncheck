@@ -1,2 +1,5 @@
 mypy
 ipython
+flake8>=2.2.4
+flake8-docstrings
+flake8-per-file-ignores

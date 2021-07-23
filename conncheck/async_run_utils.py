@@ -159,6 +159,7 @@ def keep_running(raise_interrupt: bool = False) -> bool:
 
 
 def handler(signum, _):
+    """Signal Handler."""
     logging.info("Received %s, setting interrupt to end program.",
                  signal.Signals(signum).name)
     global _interrupt
