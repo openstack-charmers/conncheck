@@ -91,7 +91,7 @@ class SpeakerUDP(SpeakerBase):
     def _conection_made(self):
         pass
 
-    def _error_recieved(self, exc: Exception) -> None:
+    def _error_received(self, exc: Exception) -> None:
         logging.error(str(exc))
 
     def _connection_made(self) -> None:
