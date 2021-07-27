@@ -164,8 +164,8 @@ _event_to_format_map = {
     REQUEST_SUCCESS: "counter:{counter} reply:{reply_counter}",
     REQUEST_TIMEOUT: "TO:{url} counter:{counter}",
     REQUEST_DGRAM: "TO:{ipv4}:{port} counter:{counter} waiting:{wait}",
-    REPLY_DGRAM: "Count:{count}",
-    REPLY_TO_DGRAN: "Count:{count} address:{ipv4}:{port}"
+    REPLY_DGRAM: "Counter:{counter}",
+    REPLY_TO_DGRAN: "Counter:{counter} address:{ipv4}:{port}"
 }
 
 

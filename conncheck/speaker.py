@@ -110,7 +110,7 @@ class SpeakerUDP(SpeakerBase):
             count = message.splitlines()[0]
         except KeyError:
             count = "<no-count-detected>"
-        self.events.log_event(events.REPLY_DGRAM, count=count)
+        self.events.log_event(events.REPLY_DGRAM, counter=count)
 
     async def request(self) -> None:
         """Request a UDP reply from a listener."""

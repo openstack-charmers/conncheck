@@ -120,8 +120,8 @@ class ListenerUDP(ListenerBase):
             count = line.split(" ")[2]
         except KeyError:
             count = "<not-detected>"
-        self.events.log_event(events.REPLY_TO_DGRAN, count=count, ipv4=addr[0],
-                              port=addr[1])
+        self.events.log_event(events.REPLY_TO_DGRAN, counter=count,
+                              ipv4=addr[0], port=addr[1])
         return utils.pad_text(f"{count}\n", self.reply_size)
 
     def _connection_lost(self, exc: Optional[Exception]) -> None:
