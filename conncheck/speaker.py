@@ -62,6 +62,7 @@ class SpeakerBase:
 
     async def speak(self) -> None:
         """Send messages until interrupted."""
+        self.events.log_event(events.START)
         while True:
             try:
                 await run.run_interruptable(self.request())
@@ -69,6 +70,8 @@ class SpeakerBase:
                 await run.sleep(self.interval, raise_interrupt=True)
             except run.InterruptException:
                 break
+            finally:
+                self.events.log_event(events.END)
 
     async def clean_up(self) -> None:
         """Clean up if needed."""
@@ -133,7 +136,6 @@ class SpeakerUDP(SpeakerBase):
                 await loop.create_datagram_endpoint(
                     lambda: UDPClient(self),
                     remote_addr=(self.ipv4, self.port)))
-            self.events.log_event(events.START)
         # Now send the message
         self.transport.sendto(message.encode())
 
@@ -144,7 +146,6 @@ class SpeakerUDP(SpeakerBase):
         except Exception:
             # we don't really care if it errors here
             pass
-        self.events.log_event(events.END)
         self.transport = None
         self.protocol = None
 
