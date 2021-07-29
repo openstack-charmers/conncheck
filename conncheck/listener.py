@@ -117,12 +117,12 @@ class ListenerUDP(ListenerBase):
         logging.debug("%s: incoming dgram from %s", self.name, addr)
         try:
             line = message.splitlines()[0]
-            count = line.split(" ")[2]
+            uuid_ = line.split(" ")[2]
         except KeyError:
-            count = "<not-detected>"
-        self.events.log_event(events.REPLY_TO_DGRAN, counter=count,
+            uuid_ = "<not-detected>"
+        self.events.log_event(events.REPLY_TO_DGRAN, uuid=uuid_,
                               ipv4=addr[0], port=addr[1])
-        return utils.pad_text(f"{count}\n", self.reply_size)
+        return utils.pad_text(f"{uuid_}\n", self.reply_size)
 
     def _connection_lost(self, exc: Optional[Exception]) -> None:
         """Handle the lost connection with a debug."""
@@ -146,8 +146,11 @@ class ListenerUDP(ListenerBase):
                      self.__class__.__name__, self.name, self.ipv4, self.port)
 
         # now wait until the process ends.
+        tick_counter = 1
         while run.keep_running():
-            logging.debug("listener: %s, tick", self.name)
+            logging.debug("listener: %s, tick: %s", self.name, tick_counter)
+            self.events.log_event(events.TICK, counter=tick_counter)
+            tick_counter += 1
             await run.sleep(events.TICK_INTERVAL)
 
     async def clean_up(self) -> None:
@@ -178,8 +181,8 @@ class ListenerHTTP(ListenerBase):
         ) -> aiohttp.web.Response:
             counter = self.next_count()
             self.events.log_event(events.REPLY_HTTP, url=request.remote,
-                                  counter=counter)
-            reply = f"Response {counter} from {self.name}.\n"
+                                  uuid=request.path)
+            reply = f"{request.path}\nResponse {counter} from {self.name}.\n"
             return aiohttp.web.Response(
                 text=utils.pad_text(reply, self.reply_size))
 
@@ -198,8 +201,11 @@ class ListenerHTTP(ListenerBase):
                      self.__class__.__name__, self.name, self.ipv4, self.port)
 
         # now wait until the process ends.
+        tick_counter = 1
         while run.keep_running():
-            logging.debug("listener: %s, tick", self.name)
+            logging.debug("listener: %s, tick: %s", self.name, tick_counter)
+            self.events.log_event(events.TICK, counter=tick_counter)
+            tick_counter += 1
             await run.sleep(events.TICK_INTERVAL)
 
     async def clean_up(self) -> None:

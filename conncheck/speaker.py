@@ -21,6 +21,7 @@ from typing import (
     Dict,
     Optional,
 )
+import uuid
 
 import aiohttp
 
@@ -55,6 +56,10 @@ class SpeakerBase:
         """Return the next count of this instance."""
         self._counter += 1
         return self._counter
+
+    def get_uuid(self) -> str:
+        """Return a UUID for the next send/receive pair."""
+        return str(uuid.uuid4())
 
     async def request(self) -> None:
         """Run request for the speaker."""
@@ -107,21 +112,22 @@ class SpeakerUDP(SpeakerBase):
     def _datagram_received(self, message: str, addr: Any) -> None:
         logging.debug("%s: Received reply from %s", self.name, addr)
         try:
-            count = message.splitlines()[0]
+            uuid_ = message.splitlines()[0]
         except KeyError:
-            count = "<no-count-detected>"
-        self.events.log_event(events.REPLY_DGRAM, counter=count)
+            uuid_ = "<no-uuid-detected>"
+        self.events.log_event(events.REPLY_DGRAM, uuid=uuid_)
 
     async def request(self) -> None:
         """Request a UDP reply from a listener."""
         try:
             counter = self.next_count()
-            message = utils.pad_text(f"{self.name} Message {counter}",
+            uuid_ = self.get_uuid()
+            message = utils.pad_text(f"{uuid_}\n{self.name} Message {counter}",
                                      self.send_size)
             await self._send(message)
             self.events.log_event(
                 events.REQUEST_DGRAM, ipv4=self.ipv4, port=self.port,
-                counter=counter, wait=self.wait)
+                counter=counter, uuid=uuid_, wait=self.wait)
         except Exception as e:
             logging.error(
                 "%s (%s) raised %s",
@@ -198,11 +204,13 @@ class SpeakerHTTP(SpeakerBase):
         """Do a request to an HTTP server."""
         try:
             counter = self.next_count()
+            uuid_ = self.get_uuid()
             timeout = aiohttp.ClientTimeout(total=self.wait)
-            url = (self.url.format(counter=counter)
-                   if "{counter}" in self.url
+            url = (self.url.format(uuid=uuid_)
+                   if "{uuid}" in self.url
                    else self.url)
-            self.events.log_event(events.REQUEST_HTTP, url=url, wait=self.wait)
+            self.events.log_event(events.REQUEST_HTTP, uuid=uuid_,
+                                  counter=counter, url=url, wait=self.wait)
             async with aiohttp.request('GET', url, timeout=timeout) as resp:
                 if resp.status == 200:
                     reply = await resp.text()
@@ -210,17 +218,21 @@ class SpeakerHTTP(SpeakerBase):
                         first = reply.splitlines()[0]
                         reply_counter = first.split(" ")[1]
                         self.events.log_event(
-                            events.REQUEST_SUCCESS, counter=counter,
+                            events.REQUEST_SUCCESS,
+                            uuid=uuid_,
+                            counter=counter,
                             reply_counter=reply_counter)
                     except KeyError:
                         self.events.log_event(
-                            events.REQUEST_SUCCESS, counter=counter,
+                            events.REQUEST_SUCCESS,
+                            uuid=uuid_,
+                            counter=counter,
                             reply_counter="N/A")
         except asyncio.TimeoutError:
-            self.events.log_event(events.REQUEST_TIMEOUT, url=url,
+            self.events.log_event(events.REQUEST_TIMEOUT, uuid=uuid_, url=url,
                                   counter=counter)
         except aiohttp.client_exceptions.ClientConnectionError:
-            self.events.log_event(events.REQUEST_FAIL, url=url,
+            self.events.log_event(events.REQUEST_FAIL, uuid=uuid_, url=url,
                                   counter=counter)
 
 

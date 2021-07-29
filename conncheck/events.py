@@ -59,6 +59,7 @@ import logging
 import os
 
 from typing import (
+    Any,
     Dict,
     IO,
     Optional,
@@ -74,15 +75,14 @@ _T = TypeVar('_T')
 
 # event types
 
-SEND = "send-request"
-REQUEST_HTTP = "request-http"
-REQUEST_FAIL = "request-http-fail"
-REQUEST_TIMEOUT = "request-http-timeout"
-REQUEST_SUCCESS = "request-http-ok"
-REPLY_HTTP = "reply-http-to"
-REQUEST_DGRAM = "request-udp"
-REPLY_DGRAM = "reply-from-udp"
-REPLY_TO_DGRAN = "reply-to-udp"
+REQUEST_HTTP = "http-tx-send"
+REQUEST_FAIL = "http-tx-fail"
+REQUEST_TIMEOUT = "http-tx-timeout"
+REQUEST_SUCCESS = "http-tx-ok"
+REPLY_HTTP = "http-rx-send-reply"
+REQUEST_DGRAM = "udp-tx-send"
+REPLY_TO_DGRAN = "udp-rx-send-reply"
+REPLY_DGRAM = "udp-tx-receive-reply"
 START = "start"
 END = "end"
 TICK = "tick"
@@ -157,15 +157,17 @@ def write_to_event_log(msg: str) -> None:
 _event_to_format_map = {
     START: "",
     END: "",
-    TICK: "",
-    REPLY_HTTP: "TO:{url} counter:{counter}",
-    REQUEST_HTTP: "TO:{url} waiting:{wait}",
-    REQUEST_FAIL: "TO:{url} counter:{counter}",
-    REQUEST_SUCCESS: "counter:{counter} reply:{reply_counter}",
-    REQUEST_TIMEOUT: "TO:{url} counter:{counter}",
-    REQUEST_DGRAM: "TO:{ipv4}:{port} counter:{counter} waiting:{wait}",
-    REPLY_DGRAM: "Counter:{counter}",
-    REPLY_TO_DGRAN: "Counter:{counter} address:{ipv4}:{port}"
+    TICK: "Counter: {counter}",
+    REPLY_HTTP: "TO:{url} uuid:{uuid}",
+    REQUEST_HTTP: "TO:{url} uuid:{uuid} counter:{counter} waiting:{wait}",
+    REQUEST_FAIL: "TO:{url} uuid:{uuid} counter:{counter}",
+    REQUEST_SUCCESS: (
+        "uuid:{uuid} counter:{counter} reply_counter:{reply_reply_counter}"),
+    REQUEST_TIMEOUT: "TO:{url} uuid:{uuid} counter:{counter}",
+    REQUEST_DGRAM: (
+        "TO:{ipv4}:{port} uuid:{uuid} counter:{counter} waiting:{wait}"),
+    REPLY_DGRAM: "uuid:{uuid}",
+    REPLY_TO_DGRAN: "uuid:{uuid} reply_uuid:{reply_uuid} address:{ipv4}:{port}"
 }
 
 
@@ -198,6 +200,11 @@ class EventLogger:
                 'unit': self.unit_name,
                 'item': self.component_name,
             }
+            for field in ('uuid', 'comment'):
+                try:
+                    fields[field] = kwargs.pop(field)
+                except KeyError:
+                    pass
             collection = config.get_config()[defaults.COLLECTION_NAME_KEY]
             log_str = format_line_protocol(
                 collection, fields, kwargs, datetime.datetime.now())
@@ -233,38 +240,47 @@ def format_line_protocol(
     :returns: formatting log line.
     """
     if isinstance(timestamp, datetime.datetime):
-        timestamp = ("{}ms".format(int(timestamp.timestamp() * 1000)))
+        timestamp = ("{}us".format(int(timestamp.timestamp() * 1e6)))
     return (
         "{collection}{tags}{fields}{timestamp}"
         .format(
             collection=collection,
-            tags=("" if not tags else ",{}".format(format_dict(tags))),
+            tags=("" if not tags else ",{}"
+                  .format(format_dict(tags, tag=True))),
             fields=("" if not fields else " {}"
                     .format(format_dict(fields))),
             timestamp=(" {}".format(timestamp) if timestamp else "")))
 
 
-def quote_value(value: str) -> str:
-    """Quote a value if it isn't quoted yet.
+def format_value(value: Any, tag: bool = False) -> str:
+    """Format a value if it isn't quoted yet.
 
-    :param value: the string to quote
+    :param value: the string to maybe to quote
+    :param tag: if this is a tag, then don't quote it, but make sure it has no
+        spaces.
     :returns: quoted value
     """
+    if tag:
+        if isinstance(value, str):
+            return value.replace(' ', '-')
+        return value
     if isinstance(value, str):
         if value.startswith('"') and value.endswith('"'):
             return value
     return '"{}"'.format(value)
 
 
-def format_dict(d: Dict[_T, str]) -> Dict[_T, str]:
+def format_dict(d: Dict[_T, str], tag: bool = False) -> Dict[_T, str]:
     """Fromat a dictionary with quoted values.
 
     :param d: the dictionary of values to quote.
+    :param tag: if the values are tags, they need have no spaces and are not
+        quoted.
     :returns: single string of comma-seperated k="v" quoted items.
     """
     assert isinstance(d, dict)
     return ",".join(
-        '{}={}'.format(k, quote_value(v))
+        '{}={}'.format(k, format_value(v, tag=tag))
         for k, v in d.items())
 
 
