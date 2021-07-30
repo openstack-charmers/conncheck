@@ -180,9 +180,14 @@ class ListenerHTTP(ListenerBase):
             request: aiohttp.web.Request
         ) -> aiohttp.web.Response:
             counter = self.next_count()
+            path = request.path
+            if path.startswith("/"):
+                path = path[1:]
+            elif not(path):
+                path="<not-detected>"
             self.events.log_event(events.REPLY_HTTP, url=request.remote,
-                                  uuid=request.path)
-            reply = f"{request.path}\nResponse {counter} from {self.name}.\n"
+                                  uuid=path)
+            reply = f"{path} {counter}\nResponse {counter} from {self.name}.\n"
             return aiohttp.web.Response(
                 text=utils.pad_text(reply, self.reply_size))
 

@@ -162,7 +162,7 @@ _event_to_format_map = {
     REQUEST_HTTP: "TO:{url} uuid:{uuid} counter:{counter} waiting:{wait}",
     REQUEST_FAIL: "TO:{url} uuid:{uuid} counter:{counter}",
     REQUEST_SUCCESS: (
-        "uuid:{uuid} counter:{counter} reply_counter:{reply_reply_counter}"),
+        "uuid:{uuid} counter:{counter} reply_counter:{reply_counter}"),
     REQUEST_TIMEOUT: "TO:{url} uuid:{uuid} counter:{counter}",
     REQUEST_DGRAM: (
         "TO:{ipv4}:{port} uuid:{uuid} counter:{counter} waiting:{wait}"),

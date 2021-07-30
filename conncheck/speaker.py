@@ -75,8 +75,7 @@ class SpeakerBase:
                 await run.sleep(self.interval, raise_interrupt=True)
             except run.InterruptException:
                 break
-            finally:
-                self.events.log_event(events.END)
+        self.events.log_event(events.END)
 
     async def clean_up(self) -> None:
         """Clean up if needed."""
@@ -212,8 +211,10 @@ class SpeakerHTTP(SpeakerBase):
             self.events.log_event(events.REQUEST_HTTP, uuid=uuid_,
                                   counter=counter, url=url, wait=self.wait)
             async with aiohttp.request('GET', url, timeout=timeout) as resp:
+                logging.debug("response: %s", resp)
                 if resp.status == 200:
                     reply = await resp.text()
+                    logging.debug("response text: %s", reply)
                     try:
                         first = reply.splitlines()[0]
                         reply_counter = first.split(" ")[1]
@@ -228,11 +229,24 @@ class SpeakerHTTP(SpeakerBase):
                             uuid=uuid_,
                             counter=counter,
                             reply_counter="N/A")
+                else:
+                    logging.debug(
+                        "Error resp.status = %s, counter=%s, uuid=%s",
+                        resp.status, counter, uuid_)
+                    self.events.log_event(
+                        events.REQUEST_FAIL,
+                        uuid=uuid_,
+                        url=url,
+                        counter=couner)
         except asyncio.TimeoutError:
             self.events.log_event(events.REQUEST_TIMEOUT, uuid=uuid_, url=url,
                                   counter=counter)
         except aiohttp.client_exceptions.ClientConnectionError:
             self.events.log_event(events.REQUEST_FAIL, uuid=uuid_, url=url,
+                                  counter=counter)
+        except Exception as e:
+            logging.error("aiohttp failed with :%s", str(e))
+            self.events.log_event(events.REQUEST_FAIL, uuid=uuid_,
                                   counter=counter)
 
 
