@@ -15,6 +15,8 @@
 """Define speaker classes for speaker behaviour."""
 
 import asyncio
+import collections
+import datetime
 import logging
 from typing import (
     Any,
@@ -94,6 +96,7 @@ class SpeakerUDP(SpeakerBase):
         self.transport = None
         self.protocol = None
         self._do_clean_up = False
+        self._sent_uuids = collections.OrderedDict()
 
     def _conection_made(self):
         pass
@@ -112,18 +115,38 @@ class SpeakerUDP(SpeakerBase):
         logging.debug("%s: Received reply from %s", self.name, addr)
         try:
             uuid_ = message.splitlines()[0]
-        except KeyError:
+        except IndexError:
             uuid_ = "<no-uuid-detected>"
-        self.events.log_event(events.REPLY_DGRAM, uuid=uuid_)
+            self.events.log_event(events.REPLY_DGRAM_INVALID, comment=uuid_)
+            return
+        try:
+            start_time = self._sent_uuids.pop(uuid_)
+            now = datetime.datetime.utcnow()
+            roundtrip = (now - start_time).total_seconds()
+            event = (events.REPLY_DGRAM_LATE
+                     if roundtrip > self.wait
+                     else events.REPLY_DGRAM)
+            self.events.log_event(event, uuid=uuid_, roundtrip=roundtrip)
+        except KeyError:
+            # uuid wasn't found.
+            self.events.log_event(events.REPLY_DGRAM_INVALID, comment=uuid_)
 
     async def request(self) -> None:
-        """Request a UDP reply from a listener."""
+        """Request a UDP reply from a listener.
+
+        Send a UDP message to the receiver and wait for the reply.  The
+        wait time is the time to track for a successful reply.  If a reply
+        comes in after the reply time then it is discarded (although logged as
+        a late reply).  See :method:`_datagram_recieved`.
+        """
         try:
             counter = self.next_count()
             uuid_ = self.get_uuid()
             message = utils.pad_text(f"{uuid_}\n{self.name} Message {counter}",
                                      self.send_size)
+            timestamp = datetime.datetime.utcnow()
             await self._send(message)
+            self._sent_uuids[uuid_] = timestamp
             self.events.log_event(
                 events.REQUEST_DGRAM, ipv4=self.ipv4, port=self.port,
                 counter=counter, uuid=uuid_, wait=self.wait)
@@ -131,6 +154,12 @@ class SpeakerUDP(SpeakerBase):
             logging.error(
                 "%s (%s) raised %s",
                 self.name, self.__class__.__name__, str(e))
+        finally:
+            # clean up very late dgrams so they become invalid
+            timestamp = datetime.datetime.utcnow()
+            for k, v in self._sent_uuids.copy().items():
+                if (timestamp - v).total_seconds() > 10 * self.wait:
+                    self._sent_uuids.pop(k)
 
     async def _send(self, message: str) -> None:
         if self._do_clean_up:
@@ -223,7 +252,7 @@ class SpeakerHTTP(SpeakerBase):
                             uuid=uuid_,
                             counter=counter,
                             reply_counter=reply_counter)
-                    except KeyError:
+                    except IndexError:
                         self.events.log_event(
                             events.REQUEST_SUCCESS,
                             uuid=uuid_,

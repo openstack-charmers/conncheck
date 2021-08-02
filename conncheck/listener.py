@@ -115,9 +115,9 @@ class ListenerUDP(ListenerBase):
     def _handle_datagram(self, message: str, addr: Any) -> None:
         """Handle the incoming datagram and reply to it."""
         logging.debug("%s: incoming dgram from %s", self.name, addr)
+        logging.debug("Message is: %s", message)
         try:
-            line = message.splitlines()[0]
-            uuid_ = line.split(" ")[2]
+            uuid_ = message.splitlines()[0]
         except KeyError:
             uuid_ = "<not-detected>"
         self.events.log_event(events.REPLY_TO_DGRAN, uuid=uuid_,
