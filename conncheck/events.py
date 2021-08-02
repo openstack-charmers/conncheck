@@ -85,11 +85,13 @@ REPLY_TO_DGRAN = "udp-rx-send-reply"
 REPLY_DGRAM = "udp-tx-receive-reply"
 REPLY_DGRAM_INVALID = "udp-tx-receive-invalid"
 REPLY_DGRAM_LATE = "udp-tx-receive-late"
+REPLY_DGRAM_TIMEOUT = "udp-tx-receive-timeout"
+REPLY_DGRAM_EXPIRED = "udp-tx-receive-expired"
+REPLY_DGRAM_UNKNOWN = "udp-tx-receive-uuid-unknown"
 START = "start"
 END = "end"
 TICK = "tick"
 TICK_INTERVAL = 5.0
-
 
 __log_file_name = None
 __log_file_handle = None
@@ -171,7 +173,11 @@ _event_to_format_map = {
     REPLY_DGRAM: "uuid:{uuid} roundtrip:{roundtrip}",
     REPLY_DGRAM_INVALID: "comment:{comment}",
     REPLY_DGRAM_LATE: "uuid:{uuid} roundtrip:{roundtrip}",
-    REPLY_TO_DGRAN: "uuid:{uuid} reply_uuid:{reply_uuid} address:{ipv4}:{port}"
+    REPLY_DGRAM_TIMEOUT: "uuid:{uuid} timeout:{timeout}",
+    REPLY_DGRAM_EXPIRED: "uuid:{uuid}",
+    REPLY_TO_DGRAN: (
+        "uuid:{uuid} reply_uuid:{reply_uuid} address:{ipv4}:{port}"),
+    REPLY_DGRAM_UNKNOWN: "uuid:{uuid}",
 }
 
 
@@ -211,7 +217,7 @@ class EventLogger:
                     pass
             collection = config.get_config()[defaults.COLLECTION_NAME_KEY]
             log_str = format_line_protocol(
-                collection, fields, kwargs, datetime.datetime.utcnow())
+                collection, fields, kwargs, datetime.datetime.now())
         else:
             if event_type not in _event_to_format_map:
                 raise KeyError(f"Unknown event type {event_type}")
@@ -220,7 +226,7 @@ class EventLogger:
             except (KeyError, TypeError) as e:
                 raise ValueError(f"Problem passing args to formatter: {e}")
             # nice ISO8601 datetime - 2020-03-20T14:32:16.458361+13:00
-            now_str = datetime.datetime.utcnow().astimezone().isoformat()
+            now_str = datetime.datetime.now().astimezone().isoformat()
             log_str = (
                 f"{now_str} {self.unit_name} {self.component_name} "
                 f"{event_type} {log}")

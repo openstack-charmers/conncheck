@@ -87,6 +87,8 @@ class SpeakerBase:
 class SpeakerUDP(SpeakerBase):
     """UDP Requester/Speaker class."""
 
+    MAX_LATE_UUIDS = 1000
+
     def __init__(self, config: Dict[str, str]) -> None:
         """Initialise a UDP Speaker."""
         super().__init__(config)
@@ -97,6 +99,7 @@ class SpeakerUDP(SpeakerBase):
         self.protocol = None
         self._do_clean_up = False
         self._sent_uuids = collections.OrderedDict()
+        self._late_uuids = collections.OrderedDict()
 
     def _conection_made(self):
         pass
@@ -119,17 +122,21 @@ class SpeakerUDP(SpeakerBase):
             uuid_ = "<no-uuid-detected>"
             self.events.log_event(events.REPLY_DGRAM_INVALID, comment=uuid_)
             return
-        try:
-            start_time = self._sent_uuids.pop(uuid_)
-            now = datetime.datetime.utcnow()
-            roundtrip = (now - start_time).total_seconds()
-            event = (events.REPLY_DGRAM_LATE
-                     if roundtrip > self.wait
-                     else events.REPLY_DGRAM)
-            self.events.log_event(event, uuid=uuid_, roundtrip=roundtrip)
-        except KeyError:
-            # uuid wasn't found.
-            self.events.log_event(events.REPLY_DGRAM_INVALID, comment=uuid_)
+        now = datetime.datetime.now()
+        for collection, event in ((self._sent_uuids, events.REPLY_DGRAM),
+                                  (self._late_uuids, events.REPLY_DGRAM_LATE)):
+            try:
+                start_time = self._sent_uuids.pop(uuid_)
+                self.events.log_event(
+                    event,
+                    uuid=uuid_,
+                    roundtrip=(now - start_time).total_seconds())
+                return
+            except KeyError:
+                # not found, so maybe late
+                pass
+        # uuid not in current or late, so log it as unknown.
+        self.events.log_event(events.REPLY_DGRAM_UNKNOWN, uuid=uuid_)
 
     async def request(self) -> None:
         """Request a UDP reply from a listener.
@@ -139,12 +146,13 @@ class SpeakerUDP(SpeakerBase):
         comes in after the reply time then it is discarded (although logged as
         a late reply).  See :method:`_datagram_recieved`.
         """
+        self._update_sent_uuids()
         try:
             counter = self.next_count()
             uuid_ = self.get_uuid()
             message = utils.pad_text(f"{uuid_}\n{self.name} Message {counter}",
                                      self.send_size)
-            timestamp = datetime.datetime.utcnow()
+            timestamp = datetime.datetime.now()
             await self._send(message)
             self._sent_uuids[uuid_] = timestamp
             self.events.log_event(
@@ -154,12 +162,27 @@ class SpeakerUDP(SpeakerBase):
             logging.error(
                 "%s (%s) raised %s",
                 self.name, self.__class__.__name__, str(e))
-        finally:
-            # clean up very late dgrams so they become invalid
-            timestamp = datetime.datetime.utcnow()
-            for k, v in self._sent_uuids.copy().items():
-                if (timestamp - v).total_seconds() > 10 * self.wait:
-                    self._sent_uuids.pop(k)
+
+    def _update_sent_uuids(self):
+        """Update the uuids in self._sent_uuids.
+
+        If they have exceeded the time-out they are added to self._late_uuids.
+        Once late uuids exceeds MAX_LATE_UUIDS, then eldest ones are dropped.
+        """
+        # move expires sent_uuids to the late set.
+        timestamp = datetime.datetime.now()
+        for uuid_, ts in self._sent_uuids.copy().items():
+            if (timestamp - ts).total_seconds() > self.wait:
+                self._sent_uuids.pop(uuid_)
+                self._late_uuids[uuid_] = ts
+                self.events.log_event(events.REPLY_DGRAM_TIMEOUT,
+                                      uuid=uuid_, timeout=self.wait)
+        # now expire (remove) any really late uuids
+        while len(self._late_uuids) > self.MAX_LATE_UUIDS:
+            # this works as self._late_uuids is an OrderedDict
+            uuid_ = list(self._late_uuids.keys())[-1]
+            self._late_uuids.pop(uuid_)
+            self.events.log_event(events.REQUEST_DGRAM_TIMEOUT, uuid=uuid_)
 
     async def _send(self, message: str) -> None:
         if self._do_clean_up:
